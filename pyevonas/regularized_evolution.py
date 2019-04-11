@@ -31,11 +31,13 @@ parser.add_argument('--deduplicate', action='store_true', default=True, help='re
 parser.add_argument('--save', type=str, default='../REvolution', help='experiment name')
 parser.add_argument('--pop_size', type=int, default=100, help='population size')
 parser.add_argument('--tournament_size', type=int, default=10, help='tournament size')
+parser.add_argument('--selection_epochs', type=int, default=108,
+                    help='selection of models based on acc @ this epoch')
 
 args = parser.parse_args()
 
-if args.deduplicate:
-    args.save = '{}-{}-{}'.format(args.save, 'Deduplicate', time.strftime("%Y%m%d-%H%M%S"))
+if not args.deduplicate:
+    args.save = '{}-{}-{}'.format(args.save, 'isomorphic', time.strftime("%Y%m%d-%H%M%S"))
 else:
     args.save = '{}-{}'.format(args.save, time.strftime("%Y%m%d-%H%M%S"))
 
@@ -242,6 +244,7 @@ def main(inputs):
     results = run_evolution_search(seed=inputs[1], population_size=args.pop_size,
                                    tournament_size=args.tournament_size,
                                    mutation_rate=1.0, deduplicates=args.deduplicate,
+                                   selection_epochs=args.selection_epochs,
                                    termination_criterion={
                                        'type': 'target',
                                        'value': inputs[0],
