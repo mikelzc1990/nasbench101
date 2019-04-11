@@ -28,7 +28,7 @@ parser.add_argument('--max_time_budget', type=int, default=5e6, help='max time b
 parser.add_argument('--max_sample_budget', type=int, default=1000, help='max sample budget')
 parser.add_argument('--target_threshold', type=float, default=0.5, help='acceptable closeness to optimum')
 parser.add_argument('--deduplicate', action='store_true', default=True, help='remove duplicates')
-parser.add_argument('--save', type=str, default='../REvolution', help='experiment name')
+parser.add_argument('--save', type=str, default='../RSearch', help='experiment name')
 parser.add_argument('--pop_size', type=int, default=100, help='population size')
 parser.add_argument('--tournament_size', type=int, default=10, help='tournament size')
 parser.add_argument('--selection_epochs', type=int, default=108,
@@ -92,51 +92,12 @@ def random_spec(hash_archive):
                 return spec, model_hash
 
 
-def random_combination(iterable, sample_size):
-    """Random selection from itertools.combinations(iterable, r)."""
-    pool = tuple(iterable)
-    n = len(pool)
-    indices = sorted(random.sample(range(n), sample_size))
-
-    return tuple(pool[i] for i in indices)
-
-
-def mutate_spec(old_spec, hash_archive, mutation_rate=1.0):
-    """Computes a valid mutated spec from the old_spec."""
-    while True:
-        new_matrix = copy.deepcopy(old_spec.original_matrix)
-        new_ops = copy.deepcopy(old_spec.original_ops)
-
-        # In expectation, V edges flipped (note that most end up being pruned).
-        edge_mutation_prob = mutation_rate / NUM_VERTICES
-        for src in range(0, NUM_VERTICES - 1):
-            for dst in range(src + 1, NUM_VERTICES):
-                if random.random() < edge_mutation_prob:
-                    new_matrix[src, dst] = 1 - new_matrix[src, dst]
-
-        # In expectation, one op is resampled.
-        op_mutation_prob = mutation_rate / OP_SPOTS
-        for ind in range(1, NUM_VERTICES - 1):
-            if random.random() < op_mutation_prob:
-                available = [o for o in nasbench.config['available_ops'] if o != new_ops[ind]]
-                new_ops[ind] = random.choice(available)
-
-        new_spec = api.ModelSpec(new_matrix, new_ops)
-        if nasbench.is_valid(new_spec):
-            model_hash = nasbench._hash_spec(new_spec)
-            if not (model_hash in hash_archive):
-                return new_spec, model_hash
-
-
 # ------------------------------ Methods Main Routine ------------------------------- #
-def run_evolution_search(seed=0,
-                         population_size=50,
-                         tournament_size=10,
-                         mutation_rate=1.0,
-                         deduplicates=True,  # if true, no re-evaluate if isomorphic networks
-                         selection_epochs=108,  # select architecture based on acc@selection_epochs
-                         termination_criterion=None):
-    """Run a single roll-out of regularized evolution to a specified termination condition."""
+def run_random_search(seed=0,
+                      deduplicates=True,  # if true, no re-evaluate if isomorphic networks
+                      selection_epochs=108,  # select architecture based on acc@selection_epochs
+                      termination_criterion=None):
+    """Run a single roll-out of random search to a specified termination condition."""
 
     # set up termination criterion
     if termination_criterion is None:
@@ -150,13 +111,10 @@ def run_evolution_search(seed=0,
     random.seed(seed)
     nasbench.reset_budget_counters()
     times, best_valids, best_tests = [0.0], [0.0], [0.0]
-    population = []  # (validation, spec) tuples
     archive = []  # stores hash tag of every evaluated network
     n_model_sampled = 0
 
-    # For the first population_size individuals, seed the population with randomly
-    # generated cells.
-    for _ in range(population_size):
+    while True:
         spec, spec_hash = random_spec(archive)
         # keep track of the hash tags of evaluated networks
         # if you don't want isomorphic networks to be re-evaluated
@@ -166,55 +124,10 @@ def run_evolution_search(seed=0,
         data = nasbench.query(spec, epochs=selection_epochs)
         time_spent, _ = nasbench.get_budget_counters()
         times.append(time_spent)
-        population.append((data['validation_accuracy'], spec))
         n_model_sampled += 1
 
-        if data['validation_accuracy'] > best_valids[-1]:
-            best_valids.append(data['validation_accuracy'])
-            best_tests.append(data['test_accuracy'])
-        else:
-            best_valids.append(best_valids[-1])
-            best_tests.append(best_tests[-1])
-
-        # offline checking
-        fixed, computed = nasbench.get_metrics_from_hash(spec_hash)
-        mean_valid_acc, _, mean_train_time = extract_mean_statistics(computed[108])
-        valid_acc_regret = (BEST_MEAN_VALID_ACC - mean_valid_acc)
-
-        # check termination criterion
-        if termination == 'time':
-            if time_spent >= termination_condition:
-                return times, best_valids, best_tests, n_model_sampled
-        elif termination == 'sample':
-            if n_model_sampled >= termination_condition:
-                return times, best_valids, best_tests, n_model_sampled
-        elif termination == 'target':
-            if valid_acc_regret <= termination_condition:
-                return times, best_valids, best_tests, n_model_sampled
-        else:
-            raise TypeError('Unknown termination type, please check !')
-
-    # After the population is seeded, proceed with evolving the population.
-    while True:
-        sample = random_combination(population, tournament_size)
-        best_spec = sorted(sample, key=lambda i: i[0])[-1][1]
-
-        new_spec, new_spec_hash = mutate_spec(best_spec, archive, mutation_rate)
-        # keep track of the hash tags of evaluated networks
-        # if you don't want isomorphic networks to be re-evaluated
-        if deduplicates:
-            archive.append(new_spec_hash)
-
-        data = nasbench.query(new_spec, epochs=selection_epochs)
-        time_spent, _ = nasbench.get_budget_counters()
-        times.append(time_spent)
-
-        # In regularized evolution, we kill the oldest individual in the population.
-        population.append((data['validation_accuracy'], new_spec))
-        population.pop(0)
-
-        n_model_sampled += 1
-
+        # It's important to select models only based on validation accuracy, test
+        # accuracy is used only for comparing different search trajectories.
         if data['validation_accuracy'] > best_valids[-1]:
             best_valids.append(data['validation_accuracy'])
             best_tests.append(data['test_accuracy'])
@@ -223,7 +136,7 @@ def run_evolution_search(seed=0,
             best_tests.append(best_tests[-1])
 
         # offline checking just for termination
-        fixed, computed = nasbench.get_metrics_from_hash(new_spec_hash)
+        fixed, computed = nasbench.get_metrics_from_hash(spec_hash)
         mean_valid_acc, _, mean_train_time = extract_mean_statistics(computed[108])
         valid_acc_regret = (BEST_MEAN_VALID_ACC - mean_valid_acc)
 
@@ -244,15 +157,14 @@ def run_evolution_search(seed=0,
 
 
 def main(inputs):
-    # execute one run of the evolution search
-    results = run_evolution_search(seed=inputs[1], population_size=args.pop_size,
-                                   tournament_size=args.tournament_size,
-                                   mutation_rate=1.0, deduplicates=args.deduplicate,
-                                   selection_epochs=args.selection_epochs,
-                                   termination_criterion={
-                                       'type': 'target',
-                                       'value': inputs[0],
-                                   })
+    # execute one run of the random search
+    results = run_random_search(seed=inputs[1],
+                                deduplicates=args.deduplicate,
+                                selection_epochs=args.selection_epochs,
+                                termination_criterion={
+                                    'type': 'target',
+                                    'value': inputs[0],
+                                })
     return results
 
 
@@ -290,5 +202,4 @@ def experiment():
 
 
 if __name__ == '__main__':
-    # main(0)
     experiment()
