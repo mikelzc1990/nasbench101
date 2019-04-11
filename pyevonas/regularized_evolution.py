@@ -260,9 +260,13 @@ def experiment():
     with open(os.path.join(args.save, 'data.pkl'), 'wb') as handle:
         pickle.dump(data, handle, protocol=0)
 
+    # save args to file
+    with open(os.path.join(args.save, 'args.pkl'), 'wb') as handle:
+        pickle.dump(args, handle, protocol=0)
+
     return
 
 
 if __name__ == '__main__':
-    main(0)
-    # experiment()
+    # main(0)
+    experiment()
