@@ -237,14 +237,14 @@ def run_evolution_search(seed=0,
     return times, best_valids, best_tests, n_model_sampled
 
 
-def main(seed):
+def main(inputs):
     # execute one run of the evolution search
-    results = run_evolution_search(seed=seed, population_size=args.pop_size,
+    results = run_evolution_search(seed=inputs[1], population_size=args.pop_size,
                                    tournament_size=args.tournament_size,
                                    mutation_rate=1.0, deduplicates=args.deduplicate,
                                    termination_criterion={
-                                       'type': args.termination,
-                                       'value': args.max_time_budget,
+                                       'type': 'target',
+                                       'value': inputs[0],
                                    })
     return results
 
@@ -252,19 +252,25 @@ def main(seed):
 def experiment():
     import multiprocessing as mp
 
+    thresholds = [0.01, 0.005, 0.001]
     np.random.seed(args.seed)
     seeds = np.random.permutation(500)[:args.n_runs].tolist()
 
-    start = time.time()
+    data = []
 
-    pool = mp.Pool(mp.cpu_count())
+    for thr in thresholds:
 
-    data = pool.map(main, seeds)
+        inputs_args = [(thr, x) for x in seeds]
 
-    pool.close()
+        start = time.time()
 
-    print('Time elapsed = {} mins'.format((time.time() - start)/60))
-    # pre-process the data before saving
+        pool = mp.Pool(mp.cpu_count())
+
+        data.append(pool.map(main, inputs_args))
+
+        pool.close()
+
+        print('For target {}, time elapsed = {} mins'.format(thr, (time.time() - start)/60))
 
     with open(os.path.join(args.save, 'data.pkl'), 'wb') as handle:
         pickle.dump(data, handle, protocol=0)
