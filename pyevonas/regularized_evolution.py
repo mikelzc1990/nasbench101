@@ -252,11 +252,14 @@ def main(seed):
 def experiment():
     import multiprocessing as mp
 
+    np.random.seed(args.seed)
+    seeds = np.random.permutation(500)[:args.n_runs].tolist()
+
     start = time.time()
 
     pool = mp.Pool(mp.cpu_count())
 
-    data = pool.map(main, list(range(args.n_runs)))
+    data = pool.map(main, seeds)
 
     pool.close()
 
