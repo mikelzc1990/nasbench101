@@ -28,7 +28,7 @@ parser.add_argument('--max_time_budget', type=int, default=5e6, help='max time b
 parser.add_argument('--max_sample_budget', type=int, default=1000, help='max sample budget')
 parser.add_argument('--target_threshold', type=float, default=0.5, help='acceptable closeness to optimum')
 parser.add_argument('--deduplicate', action='store_true', default=True, help='remove duplicates')
-parser.add_argument('--save', type=str, default='../REvolution', help='experiment name')
+parser.add_argument('--save', type=str, default='REvolution', help='experiment name')
 parser.add_argument('--pop_size', type=int, default=100, help='population size')
 parser.add_argument('--tournament_size', type=int, default=10, help='tournament size')
 
@@ -251,12 +251,15 @@ def main(seed):
 def experiment():
     import multiprocessing as mp
 
+    start = time.time()
+
     pool = mp.Pool(mp.cpu_count())
 
     data = pool.map(main, list(range(args.n_runs)))
 
     pool.close()
 
+    print('Time elapsed = {} mins'.format((time.time() - start)/60))
     # pre-process the data before saving
 
     with open(os.path.join(args.save, 'data.pkl'), 'wb') as handle:
