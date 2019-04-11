@@ -253,7 +253,9 @@ def experiment():
 
     pool = mp.Pool(mp.cpu_count())
 
-    data = [pool.apply(main, args=(seed)) for seed in list(range(args.n_runs))]
+    data = pool.map(main, list(range(args.n_runs)))
+
+    pool.close()
 
     # pre-process the data before saving
 
