@@ -2,8 +2,8 @@
 # should only be run once as it takes up to a few minutes).
 
 import sys
-# project_root_pth = "/Users/zhichao.lu/Dropbox/2019/pyevonas"
-# sys.path.insert(0, project_root_pth)
+project_root_pth = "/home/zhichao/nasbench101"
+sys.path.insert(0, project_root_pth)
 
 from nasbench import api
 
