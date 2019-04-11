@@ -253,7 +253,7 @@ def experiment():
 
     pool = mp.Pool(mp.cpu_count())
 
-    data = [pool.apply(main, args=seed) for seed in args.n_runs]
+    data = [pool.apply(main, args=seed) for seed in range(args.n_runs)]
 
     # pre-process the data before saving
 
