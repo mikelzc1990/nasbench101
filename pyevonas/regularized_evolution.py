@@ -259,7 +259,7 @@ def main(inputs):
 def experiment():
     import multiprocessing as mp
 
-    thresholds = [0.01, 0.005, 0.001]
+    thresholds = [0.01, 0.005]
     np.random.seed(args.seed)
     seeds = np.random.permutation(500)[:args.n_runs].tolist()
 

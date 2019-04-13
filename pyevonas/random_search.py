@@ -48,9 +48,13 @@ os.makedirs(args.save)
 # Use nasbench_full.tfrecord for full dataset (run download command above).
 nasbench = load(use_pickle=True, full=True)
 
-# Best mean test accuracy
-BEST_MEAN_TEST_ACC = 0.9442107081413269
-BEST_MEAN_VALID_ACC = 0.9505542318026224
+# # Best mean accuracy
+# BEST_MEAN_TEST_ACC = 0.9442107081413269
+# BEST_MEAN_VALID_ACC = 0.9505542318026224
+
+# Best mean test accuracy given params < 800,000
+BEST_MEAN_TEST_ACC = 0.8922609488169352
+BEST_MEAN_VALID_ACC = 0.8984708984692892
 
 # Useful constants
 INPUT = 'input'
@@ -76,6 +80,17 @@ def extract_mean_statistics(stats):
     return valid_acc_sum / len(stats), test_acc_sum / len(stats), train_time_sum / len(stats)
 
 
+def is_valid(spec, hash_archive):
+    # define what qualify as a valid model
+    if nasbench.is_valid(spec):
+        model_hash = nasbench._hash_spec(spec)
+        fixed, _ = nasbench.get_metrics_from_hash(model_hash)
+        if fixed['trainable_parameters'] < 800000:
+            if not (model_hash in hash_archive):
+                return spec, model_hash
+    return None
+
+
 def random_spec(hash_archive):
     """Returns a random valid spec."""
     while True:
@@ -86,10 +101,15 @@ def random_spec(hash_archive):
         ops[-1] = OUTPUT
         spec = api.ModelSpec(matrix=matrix, ops=ops)
 
-        if nasbench.is_valid(spec):
-            model_hash = nasbench._hash_spec(spec)
-            if not (model_hash in hash_archive):
-                return spec, model_hash
+        check = is_valid(spec, hash_archive)
+
+        if check is not None:
+            return check[0], check[1]
+
+        # if nasbench.is_valid(spec):
+        #     model_hash = nasbench._hash_spec(spec)
+        #     if not (model_hash in hash_archive):
+        #         return spec, model_hash
 
 
 # ------------------------------ Methods Main Routine ------------------------------- #
@@ -171,7 +191,7 @@ def main(inputs):
 def experiment():
     import multiprocessing as mp
 
-    thresholds = [0.01, 0.005, 0.001]
+    thresholds = [0.01, 0.005]
     np.random.seed(args.seed)
     seeds = np.random.permutation(500)[:args.n_runs].tolist()
 
