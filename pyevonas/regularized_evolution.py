@@ -47,9 +47,13 @@ nasbench = load(use_pickle=True, full=True)
 # BEST_MEAN_TEST_ACC = 0.9442107081413269
 # BEST_MEAN_VALID_ACC = 0.9505542318026224
 
-# Best mean test accuracy given params < 800,000
-BEST_MEAN_TEST_ACC = 0.8922609488169352
-BEST_MEAN_VALID_ACC = 0.8984708984692892
+# # Best mean test accuracy given params < 800,000
+# BEST_MEAN_TEST_ACC = 0.8922609488169352
+# BEST_MEAN_VALID_ACC = 0.8984708984692892
+
+# Best mean test accuracy given no conv 3x3
+BEST_MEAN_TEST_ACC = 0.9162326455116272
+BEST_MEAN_VALID_ACC = 0.9218416213989258
 
 # Useful constants
 INPUT = 'input'
@@ -80,7 +84,9 @@ def is_valid(spec, hash_archive):
     if nasbench.is_valid(spec):
         model_hash = nasbench._hash_spec(spec)
         fixed, _ = nasbench.get_metrics_from_hash(model_hash)
-        if fixed['trainable_parameters'] < 800000:
+        # if fixed['trainable_parameters'] < 800000:
+        operations = np.array(fixed['module_operations'])
+        if sum(operations == CONV3X3) == 0:
             if not (model_hash in hash_archive):
                 return spec, model_hash
     return None
