@@ -23,13 +23,12 @@ parser = argparse.ArgumentParser("Random search on NASBench 101")
 parser.add_argument('--seed', type=int, default=4, help='random seed')
 parser.add_argument('--n_runs', type=int, default=11, help='number of independent runs')
 parser.add_argument('--deduplicate', action='store_true', default=True, help='remove duplicates')
-parser.add_argument('--save', type=str, default='REvolution', help='experiment name')
 parser.add_argument('--pop_size', type=int, default=50, help='population size')
 parser.add_argument('--tournament_size', type=int, default=5, help='tournament size')
 parser.add_argument('--selection_epochs', type=int, default=108,
                     help='selection of models based on acc @ this epoch')
 parser.add_argument('--FEs', type=int, default=1000, help='maximum # of model samples')
-
+parser.add_argument('--save', type=str, default='params-REvolution', help='experiment name')
 args = parser.parse_args()
 
 if not args.deduplicate:
@@ -72,6 +71,17 @@ def extract_mean_statistics(stats):
     return valid_acc_sum / len(stats), test_acc_sum / len(stats), train_time_sum / len(stats)
 
 
+def is_valid(spec, hash_archive):
+    # define what qualify as a valid model
+    if nasbench.is_valid(spec):
+        model_hash = nasbench._hash_spec(spec)
+        fixed, _ = nasbench.get_metrics_from_hash(model_hash)
+        if fixed['trainable_parameters'] < 800000:
+            if not (model_hash in hash_archive):
+                return spec, model_hash
+    return None
+
+
 def random_spec(hash_archive):
     """Returns a random valid spec."""
     while True:
@@ -82,10 +92,15 @@ def random_spec(hash_archive):
         ops[-1] = OUTPUT
         spec = api.ModelSpec(matrix=matrix, ops=ops)
 
-        if nasbench.is_valid(spec):
-            model_hash = nasbench._hash_spec(spec)
-            if not (model_hash in hash_archive):
-                return spec, model_hash
+        check = is_valid(spec, hash_archive)
+
+        if check is not None:
+            return check[0], check[1]
+
+        # if nasbench.is_valid(spec):
+        #     model_hash = nasbench._hash_spec(spec)
+        #     if not (model_hash in hash_archive):
+        #         return spec, model_hash
 
 
 def random_combination(iterable, sample_size):
@@ -118,10 +133,16 @@ def mutate_spec(old_spec, hash_archive, mutation_rate=1.0):
                 new_ops[ind] = random.choice(available)
 
         new_spec = api.ModelSpec(new_matrix, new_ops)
-        if nasbench.is_valid(new_spec):
-            model_hash = nasbench._hash_spec(new_spec)
-            if not (model_hash in hash_archive):
-                return new_spec, model_hash
+
+        check = is_valid(new_spec, hash_archive)
+
+        if check is not None:
+            return check[0], check[1]
+
+        # if nasbench.is_valid(new_spec):
+        #     model_hash = nasbench._hash_spec(new_spec)
+        #     if not (model_hash in hash_archive):
+        #         return new_spec, model_hash
 
 
 # ------------------------------ Methods Main Routine ------------------------------- #
