@@ -44,8 +44,8 @@ os.makedirs(args.save)
 nasbench = load(use_pickle=True, full=True)
 
 # Best mean test accuracy
-BEST_MEAN_TEST_ACC = 0.9442107081413269
-BEST_MEAN_VALID_ACC = 0.9505542318026224
+# BEST_MEAN_TEST_ACC = 0.9442107081413269
+# BEST_MEAN_VALID_ACC = 0.9505542318026224
 
 # Best mean test accuracy given params < 800,000
 BEST_MEAN_TEST_ACC = 0.8922609488169352
