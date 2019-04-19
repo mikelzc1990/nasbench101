@@ -173,7 +173,7 @@ def run_evolution_search(seed=0,
             best_valid_acc_regret.append(valid_acc_regret)
         else:
             best_valid_acc_regret.append(best_valid_acc_regret[-1])
-            
+
         # check termination criterion
         if n_model_sampled >= args.FEs:
             return times, best_valids, best_tests, best_valid_acc_regret

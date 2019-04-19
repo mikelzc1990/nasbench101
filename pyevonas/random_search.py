@@ -22,17 +22,11 @@ from pyevonas.util.loader import load
 parser = argparse.ArgumentParser("Random search on NASBench 101")
 parser.add_argument('--seed', type=int, default=4, help='random seed')
 parser.add_argument('--n_runs', type=int, default=11, help='number of independent runs')
-parser.add_argument('--termination', type=str, default='time',
-                    help='termination conditions (options) [time, sample, target]')
-parser.add_argument('--max_time_budget', type=int, default=5e6, help='max time budget')
-parser.add_argument('--max_sample_budget', type=int, default=1000, help='max sample budget')
-parser.add_argument('--target_threshold', type=float, default=0.5, help='acceptable closeness to optimum')
 parser.add_argument('--deduplicate', action='store_true', default=True, help='remove duplicates')
 parser.add_argument('--save', type=str, default='../RSearch', help='experiment name')
-parser.add_argument('--pop_size', type=int, default=100, help='population size')
-parser.add_argument('--tournament_size', type=int, default=10, help='tournament size')
 parser.add_argument('--selection_epochs', type=int, default=108,
                     help='selection of models based on acc @ this epoch')
+parser.add_argument('--FEs', type=int, default=500, help='maximum # of model samples')
 
 args = parser.parse_args()
 
@@ -49,12 +43,12 @@ os.makedirs(args.save)
 nasbench = load(use_pickle=True, full=True)
 
 # # Best mean accuracy
-# BEST_MEAN_TEST_ACC = 0.9442107081413269
-# BEST_MEAN_VALID_ACC = 0.9505542318026224
+BEST_MEAN_TEST_ACC = 0.9442107081413269
+BEST_MEAN_VALID_ACC = 0.9505542318026224
 
 # Best mean test accuracy given params < 800,000
-BEST_MEAN_TEST_ACC = 0.8922609488169352
-BEST_MEAN_VALID_ACC = 0.8984708984692892
+# BEST_MEAN_TEST_ACC = 0.8922609488169352
+# BEST_MEAN_VALID_ACC = 0.8984708984692892
 
 # Useful constants
 INPUT = 'input'
@@ -80,15 +74,15 @@ def extract_mean_statistics(stats):
     return valid_acc_sum / len(stats), test_acc_sum / len(stats), train_time_sum / len(stats)
 
 
-def is_valid(spec, hash_archive):
-    # define what qualify as a valid model
-    if nasbench.is_valid(spec):
-        model_hash = nasbench._hash_spec(spec)
-        fixed, _ = nasbench.get_metrics_from_hash(model_hash)
-        if fixed['trainable_parameters'] < 800000:
-            if not (model_hash in hash_archive):
-                return spec, model_hash
-    return None
+# def is_valid(spec, hash_archive):
+#     # define what qualify as a valid model
+#     if nasbench.is_valid(spec):
+#         model_hash = nasbench._hash_spec(spec)
+#         fixed, _ = nasbench.get_metrics_from_hash(model_hash)
+#         if fixed['trainable_parameters'] < 800000:
+#             if not (model_hash in hash_archive):
+#                 return spec, model_hash
+#     return None
 
 
 def random_spec(hash_archive):
@@ -101,36 +95,27 @@ def random_spec(hash_archive):
         ops[-1] = OUTPUT
         spec = api.ModelSpec(matrix=matrix, ops=ops)
 
-        check = is_valid(spec, hash_archive)
+        # check = is_valid(spec, hash_archive)
+        #
+        # if check is not None:
+        #     return check[0], check[1]
 
-        if check is not None:
-            return check[0], check[1]
-
-        # if nasbench.is_valid(spec):
-        #     model_hash = nasbench._hash_spec(spec)
-        #     if not (model_hash in hash_archive):
-        #         return spec, model_hash
+        if nasbench.is_valid(spec):
+            model_hash = nasbench._hash_spec(spec)
+            if not (model_hash in hash_archive):
+                return spec, model_hash
 
 
 # ------------------------------ Methods Main Routine ------------------------------- #
 def run_random_search(seed=0,
                       deduplicates=True,  # if true, no re-evaluate if isomorphic networks
                       selection_epochs=108,  # select architecture based on acc@selection_epochs
-                      termination_criterion=None):
+                      ):
     """Run a single roll-out of random search to a specified termination condition."""
-
-    # set up termination criterion
-    if termination_criterion is None:
-        termination = 'time'  # terminate if estimated wall-clock time reached maximum
-        termination_condition = 5e6  # estimated wall-clock in seconds
-    else:
-        termination = termination_criterion['type']
-        termination_condition = termination_criterion['value']
-
     np.random.seed(seed)
     random.seed(seed)
     nasbench.reset_budget_counters()
-    times, best_valids, best_tests = [0.0], [0.0], [0.0]
+    times, best_valids, best_tests, best_valid_acc_regret = [0.0], [0.0], [0.0], [BEST_MEAN_VALID_ACC]
     archive = []  # stores hash tag of every evaluated network
     n_model_sampled = 0
 
@@ -160,56 +145,35 @@ def run_random_search(seed=0,
         mean_valid_acc, _, mean_train_time = extract_mean_statistics(computed[108])
         valid_acc_regret = (BEST_MEAN_VALID_ACC - mean_valid_acc)
 
-        # check termination criterion
-        if termination == 'time':
-            if time_spent >= termination_condition:
-                break
-        elif termination == 'sample':
-            if n_model_sampled >= termination_condition:
-                break
-        elif termination == 'target':
-            if valid_acc_regret <= termination_condition:
-                break
+        if valid_acc_regret < best_valid_acc_regret[-1]:
+            best_valid_acc_regret.append(valid_acc_regret)
         else:
-            raise TypeError('Unknown termination type, please check !')
+            best_valid_acc_regret.append(best_valid_acc_regret[-1])
 
-    return times, best_valids, best_tests, n_model_sampled
+        # check termination criterion
+        if n_model_sampled >= args.FEs:
+            return times, best_valids, best_tests, best_valid_acc_regret
 
 
-def main(inputs):
+def main(seed):
     # execute one run of the random search
-    results = run_random_search(seed=inputs[1],
+    results = run_random_search(seed=seed,
                                 deduplicates=args.deduplicate,
-                                selection_epochs=args.selection_epochs,
-                                termination_criterion={
-                                    'type': 'target',
-                                    'value': inputs[0],
-                                })
+                                selection_epochs=args.selection_epochs)
     return results
 
 
 def experiment():
     import multiprocessing as mp
 
-    thresholds = [0.01, 0.005]
     np.random.seed(args.seed)
     seeds = np.random.permutation(500)[:args.n_runs].tolist()
 
-    data = []
+    pool = mp.Pool(mp.cpu_count())
 
-    for thr in thresholds:
+    data = pool.map(main, seeds)
 
-        inputs_args = [(thr, x) for x in seeds]
-
-        start = time.time()
-
-        pool = mp.Pool(mp.cpu_count())
-
-        data.append(pool.map(main, inputs_args))
-
-        pool.close()
-
-        print('For target {}, time elapsed = {} mins'.format(thr, (time.time() - start)/60))
+    pool.close()
 
     with open(os.path.join(args.save, 'data.pkl'), 'wb') as handle:
         pickle.dump(data, handle, protocol=0)
