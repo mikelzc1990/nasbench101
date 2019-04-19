@@ -23,7 +23,7 @@ parser = argparse.ArgumentParser("Random search on NASBench 101")
 parser.add_argument('--seed', type=int, default=4, help='random seed')
 parser.add_argument('--n_runs', type=int, default=11, help='number of independent runs')
 parser.add_argument('--deduplicate', action='store_true', default=True, help='remove duplicates')
-parser.add_argument('--save', type=str, default='../REvolution', help='experiment name')
+parser.add_argument('--save', type=str, default='REvolution', help='experiment name')
 parser.add_argument('--pop_size', type=int, default=50, help='population size')
 parser.add_argument('--tournament_size', type=int, default=5, help='tournament size')
 parser.add_argument('--selection_epochs', type=int, default=108,
@@ -138,6 +138,7 @@ def run_evolution_search(seed=0,
     random.seed(seed)
     nasbench.reset_budget_counters()
     times, best_valids, best_tests, best_valid_acc_regret = [0.0], [0.0], [0.0], [BEST_MEAN_VALID_ACC]
+
     population = []  # (validation, spec) tuples
     archive = []  # stores hash tag of every evaluated network
     n_model_sampled = 0

@@ -23,7 +23,7 @@ parser = argparse.ArgumentParser("Random search on NASBench 101")
 parser.add_argument('--seed', type=int, default=4, help='random seed')
 parser.add_argument('--n_runs', type=int, default=11, help='number of independent runs')
 parser.add_argument('--deduplicate', action='store_true', default=True, help='remove duplicates')
-parser.add_argument('--save', type=str, default='../RSearch', help='experiment name')
+parser.add_argument('--save', type=str, default='RSearch', help='experiment name')
 parser.add_argument('--selection_epochs', type=int, default=108,
                     help='selection of models based on acc @ this epoch')
 parser.add_argument('--FEs', type=int, default=1000, help='maximum # of model samples')
