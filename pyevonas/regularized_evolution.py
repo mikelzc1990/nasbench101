@@ -24,18 +24,18 @@ parser.add_argument('--seed', type=int, default=4, help='random seed')
 parser.add_argument('--n_runs', type=int, default=11, help='number of independent runs')
 parser.add_argument('--deduplicate', action='store_true', default=True, help='remove duplicates')
 parser.add_argument('--save', type=str, default='../REvolution', help='experiment name')
-parser.add_argument('--pop_size', type=int, default=100, help='population size')
-parser.add_argument('--tournament_size', type=int, default=10, help='tournament size')
+parser.add_argument('--pop_size', type=int, default=50, help='population size')
+parser.add_argument('--tournament_size', type=int, default=5, help='tournament size')
 parser.add_argument('--selection_epochs', type=int, default=108,
                     help='selection of models based on acc @ this epoch')
-parser.add_argument('--FEs', type=int, default=500, help='maximum # of model samples')
+parser.add_argument('--FEs', type=int, default=1000, help='maximum # of model samples')
 
 args = parser.parse_args()
 
 if not args.deduplicate:
-    args.save = '{}-{}-{}'.format(args.save, 'isomorphic', time.strftime("%Y%m%d-%H%M%S"))
+    args.save = 'nasbench-{}-{}-{}'.format(args.save, 'isomorphic', time.strftime("%Y%m%d-%H%M%S"))
 else:
-    args.save = '{}-{}'.format(args.save, time.strftime("%Y%m%d-%H%M%S"))
+    args.save = 'nasbench-{}-{}'.format(args.save, time.strftime("%Y%m%d-%H%M%S"))
 
 abs_pth = os.path.dirname(os.path.abspath(__file__))
 args.save = os.path.join(abs_pth, args.save)

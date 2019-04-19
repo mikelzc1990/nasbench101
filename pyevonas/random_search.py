@@ -26,14 +26,14 @@ parser.add_argument('--deduplicate', action='store_true', default=True, help='re
 parser.add_argument('--save', type=str, default='../RSearch', help='experiment name')
 parser.add_argument('--selection_epochs', type=int, default=108,
                     help='selection of models based on acc @ this epoch')
-parser.add_argument('--FEs', type=int, default=500, help='maximum # of model samples')
+parser.add_argument('--FEs', type=int, default=1000, help='maximum # of model samples')
 
 args = parser.parse_args()
 
 if not args.deduplicate:
-    args.save = '{}-{}-{}'.format(args.save, 'isomorphic', time.strftime("%Y%m%d-%H%M%S"))
+    args.save = 'nasbench-{}-{}-{}'.format(args.save, 'isomorphic', time.strftime("%Y%m%d-%H%M%S"))
 else:
-    args.save = '{}-{}'.format(args.save, time.strftime("%Y%m%d-%H%M%S"))
+    args.save = 'nasbench-{}-{}'.format(args.save, time.strftime("%Y%m%d-%H%M%S"))
 
 abs_pth = os.path.dirname(os.path.abspath(__file__))
 args.save = os.path.join(abs_pth, args.save)
