@@ -22,17 +22,13 @@ from pyevonas.util.loader import load
 parser = argparse.ArgumentParser("Random search on NASBench 101")
 parser.add_argument('--seed', type=int, default=4, help='random seed')
 parser.add_argument('--n_runs', type=int, default=11, help='number of independent runs')
-parser.add_argument('--termination', type=str, default='time',
-                    help='termination conditions (options) [time, sample, target]')
-parser.add_argument('--max_time_budget', type=int, default=5e6, help='max time budget')
-parser.add_argument('--max_sample_budget', type=int, default=1000, help='max sample budget')
-parser.add_argument('--target_threshold', type=float, default=0.5, help='acceptable closeness to optimum')
 parser.add_argument('--deduplicate', action='store_true', default=True, help='remove duplicates')
 parser.add_argument('--save', type=str, default='../REvolution', help='experiment name')
 parser.add_argument('--pop_size', type=int, default=100, help='population size')
 parser.add_argument('--tournament_size', type=int, default=10, help='tournament size')
 parser.add_argument('--selection_epochs', type=int, default=108,
                     help='selection of models based on acc @ this epoch')
+parser.add_argument('--FEs', type=int, default=500, help='maximum # of model samples')
 
 args = parser.parse_args()
 
@@ -135,21 +131,13 @@ def run_evolution_search(seed=0,
                          mutation_rate=1.0,
                          deduplicates=True,  # if true, no re-evaluate if isomorphic networks
                          selection_epochs=108,  # select architecture based on acc@selection_epochs
-                         termination_criterion=None):
+                         ):
     """Run a single roll-out of regularized evolution to a specified termination condition."""
-
-    # set up termination criterion
-    if termination_criterion is None:
-        termination = 'time'  # terminate if estimated wall-clock time reached maximum
-        termination_condition = 5e6  # estimated wall-clock in seconds
-    else:
-        termination = termination_criterion['type']
-        termination_condition = termination_criterion['value']
 
     np.random.seed(seed)
     random.seed(seed)
     nasbench.reset_budget_counters()
-    times, best_valids, best_tests = [0.0], [0.0], [0.0]
+    times, best_valids, best_tests, valid_acc_regret = [0.0], [0.0], [0.0], [BEST_MEAN_VALID_ACC]
     population = []  # (validation, spec) tuples
     archive = []  # stores hash tag of every evaluated network
     n_model_sampled = 0
@@ -179,20 +167,11 @@ def run_evolution_search(seed=0,
         # offline checking
         fixed, computed = nasbench.get_metrics_from_hash(spec_hash)
         mean_valid_acc, _, mean_train_time = extract_mean_statistics(computed[108])
-        valid_acc_regret = (BEST_MEAN_VALID_ACC - mean_valid_acc)
+        valid_acc_regret.append(BEST_MEAN_VALID_ACC - mean_valid_acc)
 
         # check termination criterion
-        if termination == 'time':
-            if time_spent >= termination_condition:
-                return times, best_valids, best_tests, n_model_sampled
-        elif termination == 'sample':
-            if n_model_sampled >= termination_condition:
-                return times, best_valids, best_tests, n_model_sampled
-        elif termination == 'target':
-            if valid_acc_regret <= termination_condition:
-                return times, best_valids, best_tests, n_model_sampled
-        else:
-            raise TypeError('Unknown termination type, please check !')
+        if n_model_sampled >= args.FEs:
+            return times, best_valids, best_tests, valid_acc_regret
 
     # After the population is seeded, proceed with evolving the population.
     while True:
@@ -225,22 +204,11 @@ def run_evolution_search(seed=0,
         # offline checking just for termination
         fixed, computed = nasbench.get_metrics_from_hash(new_spec_hash)
         mean_valid_acc, _, mean_train_time = extract_mean_statistics(computed[108])
-        valid_acc_regret = (BEST_MEAN_VALID_ACC - mean_valid_acc)
+        valid_acc_regret.append(BEST_MEAN_VALID_ACC - mean_valid_acc)
 
         # check termination criterion
-        if termination == 'time':
-            if time_spent >= termination_condition:
-                break
-        elif termination == 'sample':
-            if n_model_sampled >= termination_condition:
-                break
-        elif termination == 'target':
-            if valid_acc_regret <= termination_condition:
-                break
-        else:
-            raise TypeError('Unknown termination type, please check !')
-
-    return times, best_valids, best_tests, n_model_sampled
+        if n_model_sampled >= args.FEs:
+            return times, best_valids, best_tests, valid_acc_regret
 
 
 def main(inputs):
@@ -248,11 +216,7 @@ def main(inputs):
     results = run_evolution_search(seed=inputs[1], population_size=args.pop_size,
                                    tournament_size=args.tournament_size,
                                    mutation_rate=1.0, deduplicates=args.deduplicate,
-                                   selection_epochs=args.selection_epochs,
-                                   termination_criterion={
-                                       'type': 'target',
-                                       'value': inputs[0],
-                                   })
+                                   selection_epochs=args.selection_epochs)
     return results
 
 
