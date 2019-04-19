@@ -28,7 +28,7 @@ parser.add_argument('--tournament_size', type=int, default=5, help='tournament s
 parser.add_argument('--selection_epochs', type=int, default=108,
                     help='selection of models based on acc @ this epoch')
 parser.add_argument('--FEs', type=int, default=1000, help='maximum # of model samples')
-parser.add_argument('--save', type=str, default='params-REvolution', help='experiment name')
+parser.add_argument('--save', type=str, default='time-REvolution', help='experiment name')
 args = parser.parse_args()
 
 if not args.deduplicate:
@@ -52,8 +52,12 @@ nasbench = load(use_pickle=True, full=True)
 # BEST_MEAN_VALID_ACC = 0.8984708984692892
 
 # Best mean test accuracy given no conv 3x3
-BEST_MEAN_TEST_ACC = 0.9162326455116272
-BEST_MEAN_VALID_ACC = 0.9218416213989258
+# BEST_MEAN_TEST_ACC = 0.9162326455116272
+# BEST_MEAN_VALID_ACC = 0.9218416213989258
+
+# Best mean test accuracy given can be trained under 15 mins
+BEST_MEAN_TEST_ACC = 0.931256671746572
+BEST_MEAN_VALID_ACC = 0.9377337098121644
 
 # Useful constants
 INPUT = 'input'
@@ -83,10 +87,13 @@ def is_valid(spec, hash_archive):
     # define what qualify as a valid model
     if nasbench.is_valid(spec):
         model_hash = nasbench._hash_spec(spec)
-        fixed, _ = nasbench.get_metrics_from_hash(model_hash)
+        # fixed, _ = nasbench.get_metrics_from_hash(model_hash)
+        fixed, computed = nasbench.get_metrics_from_hash(model_hash)
+        _, _, mean_train_time = extract_mean_statistics(computed[108])
         # if fixed['trainable_parameters'] < 800000:
-        operations = np.array(fixed['module_operations'])
-        if sum(operations == CONV3X3) == 0:
+        # operations = np.array(fixed['module_operations'])
+        # if sum(operations == CONV3X3) == 0:
+        if mean_train_time < 900:
             if not (model_hash in hash_archive):
                 return spec, model_hash
     return None
