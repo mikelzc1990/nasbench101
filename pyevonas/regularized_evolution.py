@@ -137,7 +137,7 @@ def run_evolution_search(seed=0,
     np.random.seed(seed)
     random.seed(seed)
     nasbench.reset_budget_counters()
-    times, best_valids, best_tests, valid_acc_regret = [0.0], [0.0], [0.0], [BEST_MEAN_VALID_ACC]
+    times, best_valids, best_tests, best_valid_acc_regret = [0.0], [0.0], [0.0], [BEST_MEAN_VALID_ACC]
     population = []  # (validation, spec) tuples
     archive = []  # stores hash tag of every evaluated network
     n_model_sampled = 0
@@ -167,11 +167,16 @@ def run_evolution_search(seed=0,
         # offline checking
         fixed, computed = nasbench.get_metrics_from_hash(spec_hash)
         mean_valid_acc, _, mean_train_time = extract_mean_statistics(computed[108])
-        valid_acc_regret.append(BEST_MEAN_VALID_ACC - mean_valid_acc)
+        valid_acc_regret = (BEST_MEAN_VALID_ACC - mean_valid_acc)
 
+        if valid_acc_regret < best_valid_acc_regret[-1]:
+            best_valid_acc_regret.append(valid_acc_regret)
+        else:
+            best_valid_acc_regret.append(best_valid_acc_regret[-1])
+            
         # check termination criterion
         if n_model_sampled >= args.FEs:
-            return times, best_valids, best_tests, valid_acc_regret
+            return times, best_valids, best_tests, best_valid_acc_regret
 
     # After the population is seeded, proceed with evolving the population.
     while True:
@@ -204,11 +209,16 @@ def run_evolution_search(seed=0,
         # offline checking just for termination
         fixed, computed = nasbench.get_metrics_from_hash(new_spec_hash)
         mean_valid_acc, _, mean_train_time = extract_mean_statistics(computed[108])
-        valid_acc_regret.append(BEST_MEAN_VALID_ACC - mean_valid_acc)
+        valid_acc_regret = (BEST_MEAN_VALID_ACC - mean_valid_acc)
+
+        if valid_acc_regret < best_valid_acc_regret[-1]:
+            best_valid_acc_regret.append(valid_acc_regret)
+        else:
+            best_valid_acc_regret.append(best_valid_acc_regret[-1])
 
         # check termination criterion
         if n_model_sampled >= args.FEs:
-            return times, best_valids, best_tests, valid_acc_regret
+            return times, best_valids, best_tests, best_valid_acc_regret
 
 
 def main(seed):
