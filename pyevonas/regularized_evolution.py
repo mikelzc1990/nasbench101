@@ -44,8 +44,8 @@ os.makedirs(args.save)
 nasbench = load(use_pickle=True, full=True)
 
 # Best mean test accuracy
-# BEST_MEAN_TEST_ACC = 0.9442107081413269
-# BEST_MEAN_VALID_ACC = 0.9505542318026224
+BEST_MEAN_TEST_ACC = 0.9442107081413269
+BEST_MEAN_VALID_ACC = 0.9505542318026224
 
 # # Best mean test accuracy given params < 800,000
 # BEST_MEAN_TEST_ACC = 0.8922609488169352
@@ -55,9 +55,9 @@ nasbench = load(use_pickle=True, full=True)
 # BEST_MEAN_TEST_ACC = 0.9162326455116272
 # BEST_MEAN_VALID_ACC = 0.9218416213989258
 
-# Best mean test accuracy given can be trained under 15 mins
-BEST_MEAN_TEST_ACC = 0.931256671746572
-BEST_MEAN_VALID_ACC = 0.9377337098121644
+# # Best mean test accuracy given can be trained under 15 mins
+# BEST_MEAN_TEST_ACC = 0.931256671746572
+# BEST_MEAN_VALID_ACC = 0.9377337098121644
 
 # Useful constants
 INPUT = 'input'
@@ -88,14 +88,14 @@ def is_valid(spec, hash_archive):
     if nasbench.is_valid(spec):
         model_hash = nasbench._hash_spec(spec)
         # fixed, _ = nasbench.get_metrics_from_hash(model_hash)
-        fixed, computed = nasbench.get_metrics_from_hash(model_hash)
-        _, _, mean_train_time = extract_mean_statistics(computed[108])
+        # fixed, computed = nasbench.get_metrics_from_hash(model_hash)
+        # _, _, mean_train_time = extract_mean_statistics(computed[108])
         # if fixed['trainable_parameters'] < 800000:
         # operations = np.array(fixed['module_operations'])
         # if sum(operations == CONV3X3) == 0:
-        if mean_train_time < 900:
-            if not (model_hash in hash_archive):
-                return spec, model_hash
+        # if mean_train_time < 900:
+        if not (model_hash in hash_archive):
+            return spec, model_hash
     return None
 
 
@@ -175,7 +175,8 @@ def run_evolution_search(seed=0,
     np.random.seed(seed)
     random.seed(seed)
     nasbench.reset_budget_counters()
-    times, best_valids, best_tests, best_valid_acc_regret = [0.0], [0.0], [0.0], [BEST_MEAN_VALID_ACC]
+    times, best_valids, best_tests = [0.0], [0.0], [0.0]
+    best_valid_acc_regret, best_test_acc_regret = [BEST_MEAN_VALID_ACC], [BEST_MEAN_TEST_ACC]
 
     population = []  # (validation, spec) tuples
     archive = []  # stores hash tag of every evaluated network
@@ -205,17 +206,23 @@ def run_evolution_search(seed=0,
 
         # offline checking
         fixed, computed = nasbench.get_metrics_from_hash(spec_hash)
-        mean_valid_acc, _, mean_train_time = extract_mean_statistics(computed[108])
+        mean_valid_acc, mean_test_acc, mean_train_time = extract_mean_statistics(computed[108])
         valid_acc_regret = (BEST_MEAN_VALID_ACC - mean_valid_acc)
+        test_acc_regret = (BEST_MEAN_TEST_ACC - mean_test_acc)
 
         if valid_acc_regret < best_valid_acc_regret[-1]:
             best_valid_acc_regret.append(valid_acc_regret)
         else:
             best_valid_acc_regret.append(best_valid_acc_regret[-1])
 
+        if test_acc_regret < best_test_acc_regret[-1]:
+            best_test_acc_regret.append(test_acc_regret)
+        else:
+            best_test_acc_regret.append(best_test_acc_regret[-1])
+
         # check termination criterion
         if n_model_sampled >= args.FEs:
-            return times, best_valids, best_tests, best_valid_acc_regret
+            return times, best_valids, best_tests, best_valid_acc_regret, best_test_acc_regret
 
     # After the population is seeded, proceed with evolving the population.
     while True:
@@ -255,9 +262,14 @@ def run_evolution_search(seed=0,
         else:
             best_valid_acc_regret.append(best_valid_acc_regret[-1])
 
+        if test_acc_regret < best_test_acc_regret[-1]:
+            best_test_acc_regret.append(test_acc_regret)
+        else:
+            best_test_acc_regret.append(best_test_acc_regret[-1])
+
         # check termination criterion
         if n_model_sampled >= args.FEs:
-            return times, best_valids, best_tests, best_valid_acc_regret
+            return times, best_valids, best_tests, best_valid_acc_regret, best_test_acc_regret
 
 
 def main(seed):
